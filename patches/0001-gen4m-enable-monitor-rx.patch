@@ -1,0 +1,20 @@
+diff --git a/connectivity/wlan/core/gen4m/Kbuild.6878 b/connectivity/wlan/core/gen4m/Kbuild.6878
+index 61051a7..bf9734d 100644
+--- a/connectivity/wlan/core/gen4m/Kbuild.6878
++++ b/connectivity/wlan/core/gen4m/Kbuild.6878
+@@ -11,4 +11,15 @@ MTK_ANDROID_WMT := y
+ MTK_ANDROID_EMI := y
+ MODULE_NAME := wlan_drv_gen4m_6878
+ 
++# --- Malachite: native monitor mode (radiotap RX) ----------------------------
++# Turns on MediaTek's own monitor support: NL80211_IFTYPE_MONITOR, radiotap RX,
++# and mtk_cfg80211_set_monitor_channel -> CMD_ID_SET_MONITOR. Passive capture
++# only; no transmit behaviour is changed by these flags. This is the first-test
++# (passive) configuration. Injection is a separate patch (0002).
++# See wifi-monitor-injection/notes/2026-11-10-wifi-injection-handoff.md.
++CONFIG_SNIFFER_RADIOTAP := y
++ccflags-y += -DCFG_SUPPORT_SNIFFER_RADIOTAP
++ccflags-y += -DCFG_SUPPORT_PDMA_SCATTER
++# -----------------------------------------------------------------------------
++
+ include $(KO_CODE_PATH)/Kbuild.main

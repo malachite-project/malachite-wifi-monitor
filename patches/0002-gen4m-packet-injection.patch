@@ -1,0 +1,90 @@
+diff --git a/connectivity/wlan/core/gen4m/Kbuild.6878 b/connectivity/wlan/core/gen4m/Kbuild.6878
+index bf9734d..5540b17 100644
+--- a/connectivity/wlan/core/gen4m/Kbuild.6878
++++ b/connectivity/wlan/core/gen4m/Kbuild.6878
+@@ -20,6 +20,14 @@ MODULE_NAME := wlan_drv_gen4m_6878
+ CONFIG_SNIFFER_RADIOTAP := y
+ ccflags-y += -DCFG_SUPPORT_SNIFFER_RADIOTAP
+ ccflags-y += -DCFG_SUPPORT_PDMA_SCATTER
++# --- Malachite: packet injection ---------------------------------------------
++# Injected 802.11 frames are transmitted through the firmware's 802.11 data path
++# (the management-frame mechanism). nic_tx.c only sets MSDU_INFO.fgIs802_11 for
++# ENUM_PKT_802_11_MGMT skbs when CFG_SUPPORT_TX_MGMT_USE_DATAQ is on, so enable
++# it. NOTE: this routes ALL management frames through the data queue, a
++# behavioural change for normal operation — do NOT include this in the passive
++# first-test build; validate stability on a tester device before shipping.
++ccflags-y += -DCFG_SUPPORT_TX_MGMT_USE_DATAQ=1
+ # -----------------------------------------------------------------------------
+ 
+ include $(KO_CODE_PATH)/Kbuild.main
+diff --git a/connectivity/wlan/core/gen4m/os/linux/gl_init.c b/connectivity/wlan/core/gen4m/os/linux/gl_init.c
+index 1c52a24..5956161 100644
+--- a/connectivity/wlan/core/gen4m/os/linux/gl_init.c
++++ b/connectivity/wlan/core/gen4m/os/linux/gl_init.c
+@@ -3233,6 +3233,66 @@ netdev_tx_t wlanHardStartXmit(struct sk_buff *prSkb,
+ 		return NETDEV_TX_OK;
+ 	}
+ #endif
++#ifdef CFG_SUPPORT_SNIFFER_RADIOTAP
++	/* Malachite: monitor-mode packet injection.
++	 *
++	 * In monitor mode the stack hands us a radiotap header followed by a
++	 * fully-formed 802.11 frame. Strip the radiotap header and submit the
++	 * raw 802.11 frame through the firmware's 802.11 data-path TX (the same
++	 * path management frames use), so the chip transmits it verbatim rather
++	 * than treating it as an 802.3 payload. Requires CFG_SUPPORT_TX_MGMT_
++	 * USE_DATAQ (set in Kbuild.6878) so ENUM_PKT_802_11_MGMT skbs get
++	 * MSDU_INFO.fgIs802_11 = TRUE and the CONNAC2 TXD HEADER_FORMAT_802_11.
++	 *
++	 * BSS BINDING needs on-device bring-up: a pure monitor interface has
++	 * ucBssIdx = 0xff (invalid), so fall back to the AIS default-link BSS
++	 * when one exists. If no valid BSS exists we drop and log rather than
++	 * hand the firmware an invalid index (which can fault). Whether the
++	 * firmware transmits a frame with a spoofed source address (vs. stamping
++	 * its own) is unproven — verify with aireplay-ng -9 on a tester device.
++	 * See wifi-monitor-injection/notes/2026-11-10-wifi-injection-handoff.md.
++	 */
++	if (prGlueInfo->fgIsEnableMon) {
++		uint16_t u2RtapLen;
++		struct ADAPTER *prAdapter = prGlueInfo->prAdapter;
++
++		/* radiotap: [0]=ver [1]=pad [2..3]=le16 total header length */
++		if (prSkb->len < 4) {
++			dev_kfree_skb(prSkb);
++			return NETDEV_TX_OK;
++		}
++		u2RtapLen = le16_to_cpu(*(uint16_t *)(prSkb->data + 2));
++		if (u2RtapLen >= prSkb->len) {
++			DBGLOG(TX, WARN,
++				"inject: bad radiotap len %u (skb %u)\n",
++				u2RtapLen, prSkb->len);
++			dev_kfree_skb(prSkb);
++			return NETDEV_TX_OK;
++		}
++		skb_pull(prSkb, u2RtapLen);
++
++		if (!IS_BSS_INDEX_VALID(ucBssIndex))
++			ucBssIndex = aisGetDefaultLinkBssIndex(prAdapter);
++		if (!IS_BSS_INDEX_VALID(ucBssIndex)) {
++			DBGLOG(TX, WARN,
++				"inject: no valid BSS for monitor TX, drop\n");
++			dev_kfree_skb(prSkb);
++			return NETDEV_TX_OK;
++		}
++
++		/* Reset the skb control block FIRST (kalResetPacket zeroes
++		 * skb->cb), THEN set the 802.11 packet flag, or the flag is
++		 * wiped before kalHardStartXmit reads it.
++		 */
++		kalResetPacket(prGlueInfo, (void *) prSkb);
++		GLUE_SET_PKT_FLAG(prSkb, ENUM_PKT_802_11_MGMT);
++		if (kalHardStartXmit(prSkb, prDev, prGlueInfo, ucBssIndex)
++				!= WLAN_STATUS_SUCCESS)
++			DBGLOG(TX, WARN, "inject: enqueue failed\n");
++		return NETDEV_TX_OK;
++	}
++#endif /* CFG_SUPPORT_SNIFFER_RADIOTAP */
++
+ 	kalResetPacket(prGlueInfo, (void *) prSkb);
+ 	if (kalHardStartXmit(prSkb, prDev, prGlueInfo,
+ 			     ucBssIndex) == WLAN_STATUS_SUCCESS) {

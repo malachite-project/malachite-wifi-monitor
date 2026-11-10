@@ -1,0 +1,6 @@
+id=malachite_wifi_monitor
+name=malachite: Wi-Fi monitor mode + injection (test)
+version=0.1-unbuilt
+versionCode=1
+author=noamtu123
+description=TEST MODULE (payload not built yet). Replaces the internal Wi-Fi driver (wlan_drv_gen4m_6878.ko) with a source build that enables native monitor mode (radiotap RX) and packet injection (raw 802.11 TX via the firmware data path), and ships Android-native aircrack-ng tools. Monitor is dormant until armed with the action button. Remove the module and reboot to restore the stock driver. For authorized security testing only.
