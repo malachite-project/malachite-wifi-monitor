@@ -25,3 +25,9 @@ Two confirmed blockers at the gen4m source commit the build uses (`ce0e095`):
 
 Until then, ship monitor **capture only** (`../0001-gen4m-passive-monitor.patch`), which
 drops TX in monitor mode. See `../../FINDINGS-2026-11-12.md`.
+
+---
+**Update:** injection is feasible on this same base via the management-TX path
+(`cnmMgtPktAlloc` + `MID_MNY_AIS_MGMT_TX`), which needs no newer source and no
+`ENUM_PKT_802_11_MGMT`. See `../../INJECTION-DESIGN.md`. This 0002 (data-queue) approach
+stays blocked, but it is no longer the only route.
