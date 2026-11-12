@@ -1,15 +1,5 @@
-# malachite Wi-Fi monitor mode + injection — SELinux
-#
-# Deliberately minimal. Do NOT blanket `setenforce 0` (the o1s module did, and
-# it is the wrong approach — it masks real denials and weakens the whole system).
-#
-# The correct rules can only be written from the ACTUAL AVC denials seen when a
-# tester arms monitor and runs the native tools with SELinux enforcing. Capture
-# them with:  dmesg | grep avc   (or `logcat -b events | grep avc`)
-# then add targeted allow rules here for the exact domain/type/class/perm.
-#
-# Likely domains to watch: the shell/ksu domain running iw/ip and the aircrack
-# tools, operating on the wlan netdev and the driver's char/proc nodes. Add
-# rules only for what is actually denied; keep SELinux enforcing.
-#
-# (no rules yet — fill from on-device AVCs)
+# SELinux rules for the driver swap. Intentionally EMPTY until we see a real
+# denial - no blanket permissive. If swap.log shows "---- relevant AVC denials ----"
+# with a module_load / sys_module denial, add the exact, minimal matching rule
+# here (e.g.  allow <scontext> <tcontext>:system module_load;  for the types the
+# AVC names) and reship. Keep it to the named types only.

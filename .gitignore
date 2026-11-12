@@ -1,2 +1,9 @@
 NUL
 *.log
+# built payload / third-party binaries are not tracked here - build them from
+# patches/ and drop them into ksu-module/.../modules and .../tools, or attach
+# the flashable zip to a GitHub Release instead.
+*.ko
+*.zip
+ksu-module/malachite-wifi-monitor/tools/aireplay-ng
+ksu-module/malachite-wifi-monitor/tools/airodump-ng

@@ -10,13 +10,24 @@ MODDIR=${0%/*}
 STATE="$STATEDIR/menu.state"
 S="$(cat "$STATE" 2>/dev/null || echo 0)"
 
+# Which driver is actually resident? Stock gen4m advertises NO monitor type.
+MON="$(iw phy 2>/dev/null | grep -ci '\* monitor')"
+if [ "$MON" -ge 1 ] 2>/dev/null; then
+  echo "driver: OURS loaded (monitor-capable)."
+else
+  echo "driver: looks like STOCK (no monitor type advertised) — the boot swap"
+  echo "        may not have taken. Recent swap.log:"
+  tail -6 "$STATEDIR/swap.log" 2>/dev/null
+fi
+echo
+
 case "$S" in
   0) echo "== Arm monitor, 2.4GHz channel 6 =="
      if arm_monitor 6;  then echo "OK: armed on ch6";  echo 1 > "$STATE"
-     else echo "FAILED: see $LOG"; fi ;;
+     else echo "FAILED: see $LOG"; echo 0 > "$STATE"; fi ;;
   1) echo "== Arm monitor, 5GHz channel 36 =="
      if arm_monitor 36; then echo "OK: armed on ch36"; echo 2 > "$STATE"
-     else echo "FAILED: see $LOG"; fi ;;
+     else echo "FAILED: see $LOG"; echo 0 > "$STATE"; fi ;;
   2) echo "== Injection self-test (aireplay-ng -9) =="
      T="$MODDIR/tools/aireplay-ng"
      if [ -x "$T" ]; then

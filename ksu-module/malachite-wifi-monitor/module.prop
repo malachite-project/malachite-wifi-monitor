@@ -1,6 +1,6 @@
 id=malachite_wifi_monitor
-name=malachite: Wi-Fi monitor mode + injection (test)
-version=0.1-unbuilt
-versionCode=1
+name=malachite: Wi-Fi monitor mode + injection (TEST)
+version=1.2-active-swap
+versionCode=12
 author=noamtu123
-description=TEST MODULE (payload not built yet). Replaces the internal Wi-Fi driver (wlan_drv_gen4m_6878.ko) with a source build that enables native monitor mode (radiotap RX) and packet injection (raw 802.11 TX via the firmware data path), and ships Android-native aircrack-ng tools. Monitor is dormant until armed with the action button. Remove the module and reboot to restore the stock driver. For authorized security testing only.
+description=TEST. On each boot, actively unloads the stock gen4m Wi-Fi driver and loads source builds (wlan + cfg80211 + mac80211) that add native monitor mode and packet injection; bundles airodump-ng/aireplay-ng. Fail-safe: never unloads stock unless a restorable stock copy exists, and auto-restores stock if ours does not bring wlan0 up (Wi-Fi is never left broken - worst case is plain stock after a reboot). After reboot check /data/adb/malachite_wifi_monitor/swap.log (insmod wlan rc=0, wlan0 up, monitor-capable>=1). Authorized security testing only. Remove + reboot to go back to stock.

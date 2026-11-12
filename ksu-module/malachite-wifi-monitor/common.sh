@@ -16,11 +16,19 @@ IFACE=wlan0
 STATEDIR=/data/adb/malachite_wifi_monitor
 LOG="$STATEDIR/run.log"
 WIFI_STATE_FILE="$STATEDIR/wifi_was"
+SWAP_LOCK="$STATEDIR/.swap.lock"
 
 mkdir -p "$STATEDIR" 2>/dev/null
 chmod 700 "$STATEDIR" 2>/dev/null
 
 log() { echo "[$(date)] $*" | tee -a "$LOG"; }
+
+# The boot-time driver swap (swap.sh) holds this lock while it tears Wi-Fi down
+# and reloads the stack. Arming on top of that would race svc/iw — refuse.
+swap_busy() { [ -d "$SWAP_LOCK" ]; }
+
+# Is the wlan0 netdev present at all? (driver not loaded -> nothing to arm)
+have_iface() { ip link show "$IFACE" >/dev/null 2>&1; }
 
 # Resolve a usable `iw`: prefer the bundled one, else system. Returns non-zero
 # and sets IW empty if none is found — callers MUST check before touching Wi-Fi.
@@ -47,8 +55,16 @@ restore_wifi_state() {
 
 arm_monitor() {  # $1 = channel (e.g. 6 or 36)
 	CH="${1:-6}"
+	if swap_busy; then
+		log "boot driver swap still running — try again in a moment."
+		return 1
+	fi
 	if ! resolve_iw; then
 		log "ERROR: no 'iw' binary found (bundle it under tools/). NOT touching Wi-Fi."
+		return 1
+	fi
+	if ! have_iface; then
+		log "ERROR: $IFACE not present (driver not loaded?). NOT touching Wi-Fi."
 		return 1
 	fi
 	log "arming monitor on $IFACE channel $CH (iw=$IW)"
@@ -71,7 +87,7 @@ arm_monitor() {  # $1 = channel (e.g. 6 or 36)
 	done
 	ip link set "$IFACE" down 2>>"$LOG"
 	if ! "$IW" dev "$IFACE" set type monitor 2>>"$LOG"; then
-		log "ERROR: could not set monitor type; rolling back"
+		log "ERROR: could not set monitor type (driver has no monitor support?); rolling back"
 		disarm_monitor
 		return 1
 	fi
@@ -104,6 +120,10 @@ status() {
 	echo "iface:   $IFACE"
 	echo "iw:      ${IW:-NOT FOUND}"
 	[ -n "$IW" ] && echo "type:    $("$IW" dev "$IFACE" info 2>/dev/null | grep -i -E 'type|channel' | tr '\n' ' ')"
-	echo "driver:  $(modinfo wlan_drv_gen4m_6878 2>/dev/null | grep -E 'vermagic|srcversion' | tr '\n' ' ')"
+	# Authoritative "is OURS loaded?" signal: the stock gen4m driver advertises
+	# NO monitor interface type; ours does. (modinfo reads the on-disk FILE, not
+	# the resident module, so it can mislead — keep it only as a hint.)
+	echo "monitor-capable: $(iw phy 2>/dev/null | grep -ci '\* monitor') (>=1 => OURS loaded)"
+	echo "ondisk:  $(modinfo wlan_drv_gen4m_6878 2>/dev/null | grep -E 'vermagic' | tr '\n' ' ')"
 	echo "sniffer: $(dmesg 2>/dev/null | grep -i 'enable sniffer' | tail -1)"
 }
