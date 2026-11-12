@@ -14,10 +14,14 @@ have no phone).
 
 | Piece | State |
 | --- | --- |
-| Monitor RX (patch 0001) | Written; enables MediaTek's own support. Works if firmware honours `CMD_ID_SET_MONITOR` — unverified. The first test build. |
-| Injection TX (patch 0002) | Written, first implementation via the chip's raw-802.11 data path (no firmware patch needed for the mechanism). Not built/verified. Monitor-mode BSS binding needs on-device bring-up; firmware address-stamping is the open hardware question. |
-| KSU module | Scaffold complete and hardened; payload `.ko` + native tools pending the build. For the first test prefer a vendor_dlkm swap (see below). |
-| The `.ko` build | **Not done** — needs a `kernel_manifest-6.1` build + ABI/CRC match. |
+| Monitor RX (patch 0001) | **Built from source** (6.1.167, monitor confirmed). Uses `CONFIG_SNIFFER_RADIOTAP` + a TX-drop guard (capture only, TX dropped in monitor mode). Not yet ABI-matched or phone-verified. |
+| ABI gap | Candidate (6.1.167) mismatches the shipped **6.1.166** Image on 3 cfg80211 symbols. Resolution and the hold-the-CI reason: `FINDINGS-2026-11-12.md`. |
+| Injection TX (patch 0002) | **BLOCKED — do not build.** `ENUM_PKT_802_11_MGMT` isn't in the enum at this commit (won't compile), and monitor mode tears down the AIS BSS (no context to TX on). Moved to `patches/blocked/`. |
+| KSU module | Scaffold complete and hardened; for the first test prefer a **vendor_dlkm swap** (loader race). |
+
+> **Read `FINDINGS-2026-11-12.md` first** — it supersedes the status below with what was
+> learned from the actual build and audit (passive `.ko` exists, the 3-symbol ABI gap and
+> its fix, why injection is blocked, and the firmware-identification plan).
 
 > Reviewed 2026-11-10 (external): fixed a compile blocker (`prAisBssInfo` →
 > `aisGetDefaultLinkBssIndex()`) and a flag-wipe ordering bug (`kalResetPacket`
@@ -32,13 +36,14 @@ have no phone).
 ```
 wifi-monitor-injection/
 ├── README.md                 ← this index
+├── FINDINGS-2026-11-12.md     ← current status: build done, ABI gap, injection blocked
 ├── notes/
 │   ├── 2026-11-10-wifi-injection-handoff.md   ← full guide: device facts, how o1s
 │   │                                             did it, routes, blockers, §10 staged work
 │   └── 2026-11-10-wifi-monitor-mode.md         ← the original analysis
 ├── patches/
-│   ├── 0001-gen4m-enable-monitor-rx.patch      ← passive monitor RX (first test)
-│   ├── 0002-gen4m-packet-injection.patch       ← injection, apply on top of 0001
+│   ├── 0001-gen4m-passive-monitor.patch        ← passive monitor RX (BUILT; TX-drop guard)
+│   ├── blocked/0002-gen4m-packet-injection.patch ← injection (BLOCKED, do not build)
 │   ├── sniffer.fragment.config
 │   └── BUILD.md              ← how to apply, build the .ko, and verify on-device
 └── ksu-module/

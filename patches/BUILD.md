@@ -11,8 +11,8 @@ Background and the full technical rationale:
 
 | File | What it does |
 | --- | --- |
-| `0001-gen4m-enable-monitor-rx.patch` | `Kbuild.6878`: `CFG_SUPPORT_SNIFFER_RADIOTAP` + `CFG_SUPPORT_PDMA_SCATTER`. **Monitor RX only — no TX behaviour changes.** This is the first-test (passive) build. |
-| `0002-gen4m-packet-injection.patch` | `Kbuild.6878`: adds `CFG_SUPPORT_TX_MGMT_USE_DATAQ=1`; and `os/linux/gl_init.c` `wlanHardStartXmit`: strips radiotap and submits the raw 802.11 frame via the firmware's 802.11 data-path TX. Apply **on top of 0001** only for the injection build. |
+| `0001-gen4m-passive-monitor.patch` | `Kbuild.6878`: `CFG_SUPPORT_SNIFFER_RADIOTAP` + `CFG_SUPPORT_PDMA_SCATTER`. **Monitor RX only — no TX behaviour changes.** This is the first-test (passive) build. |
+| `patches/blocked/0002-gen4m-packet-injection.patch` (BLOCKED — see FINDINGS-2026-11-12.md) | `Kbuild.6878`: adds `CFG_SUPPORT_TX_MGMT_USE_DATAQ=1`; and `os/linux/gl_init.c` `wlanHardStartXmit`: strips radiotap and submits the raw 802.11 frame via the firmware's 802.11 data-path TX. Apply **on top of 0001** only for the injection build. |
 | `sniffer.fragment.config` | Kernel config fragment (`CONFIG_SNIFFER_RADIOTAP=y`). |
 
 The KSU test module that delivers the built driver + native tools:
@@ -42,15 +42,16 @@ local `src/ref_mt6878devs_kernel_modules`, branch `lineage-23.2`). Apply inside
 whatever `kernel_modules` checkout the kernel build consumes, from its repo root:
 
 ```sh
-# First (passive) test build — monitor RX only:
-git apply --ignore-whitespace 0001-gen4m-enable-monitor-rx.patch
-
-# Injection build — add 0002 on top:
-git apply --ignore-whitespace 0002-gen4m-packet-injection.patch
+# Passive monitor RX build (the only one to build now):
+git apply --ignore-whitespace 0001-gen4m-passive-monitor.patch
 ```
 
-`--ignore-whitespace` matters: the source uses CRLF and the patches are
-normalised to ignore CR-at-EOL. Both were `git apply --check`-verified in
+Do **not** build `patches/blocked/0002-gen4m-packet-injection.patch` — it does not
+compile at this commit and cannot transmit in monitor mode (see
+`patches/blocked/README.md` and `../FINDINGS-2026-11-12.md`).
+
+`--ignore-whitespace` matters: the source uses CRLF and the patch is
+normalised to ignore CR-at-EOL. It was `git apply --check`-verified in
 sequence against the pristine tree.
 
 ## Build the module (no local pipeline — this is the gating step)
